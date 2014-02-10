@@ -34,6 +34,7 @@ import hudson.matrix.MatrixRun;
 import hudson.maven.MavenModuleSet;
 import hudson.model.*;
 import hudson.model.Cause.UserCause;
+import hudson.plugins.copyartifact.recipes.WithPluginsDisabled;
 import hudson.security.ACL;
 import hudson.security.AuthorizationMatrixProperty;
 import hudson.security.GlobalMatrixAuthorizationStrategy;
@@ -45,12 +46,14 @@ import hudson.tasks.BuildTrigger;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
 import hudson.util.VersionNumber;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.Callable;
-import jenkins.model.Jenkins;
-import org.acegisecurity.context.SecurityContext;
 
+import jenkins.model.Jenkins;
+
+import org.acegisecurity.context.SecurityContext;
 import org.acegisecurity.context.SecurityContextHolder;
 import org.acegisecurity.providers.UsernamePasswordAuthenticationToken;
 import org.junit.Test;
@@ -60,8 +63,10 @@ import org.jvnet.hudson.test.HudsonTestCase;
 import org.jvnet.hudson.test.CaptureEnvironmentBuilder;
 import org.jvnet.hudson.test.FailureBuilder;
 import org.jvnet.hudson.test.MockFolder;
+import org.jvnet.hudson.test.TestPluginManager;
 import org.jvnet.hudson.test.UnstableBuilder;
 import org.jvnet.hudson.test.recipes.LocalData;
+import org.jvnet.hudson.test.recipes.WithPluginManager;
 
 import static org.junit.Assert.assertTrue;
 
@@ -1087,6 +1092,12 @@ public class CopyArtifactTest extends HudsonTestCase {
         CopyArtifact trigger = (CopyArtifact) p.getBuilders().get(0);
 
         assertTrue(trigger.isFingerprintArtifacts());
+    }
+
+    @WithPluginsDisabled("maven-plugin")
+    public void testLaunchWithoutMaven() throws Exception {
+        assertNull(jenkins.getPlugin("maven-plugin"));
+        assertNotNull(jenkins.getPlugin("copyartifact"));
     }
 
     /* This test is available only for Jenkins >= 1.521.
