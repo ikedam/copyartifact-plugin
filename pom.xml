@@ -28,6 +28,15 @@
                 <artifactId>maven-hpi-plugin</artifactId>
                 <version>1.95</version>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                  <classpathDependencyExcludes>
+                    <classpathDependencyExcludes>org.jenkins-ci.main:maven-plugin</classpathDependencyExcludes>
+                  </classpathDependencyExcludes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
     <reporting>
