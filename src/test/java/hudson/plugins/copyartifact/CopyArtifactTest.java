@@ -480,10 +480,10 @@ public class CopyArtifactTest extends HudsonTestCase {
 
     public void testExcludes() throws Exception {
         FreeStyleProject other = createFreeStyleProject(), p = createFreeStyleProject();
-        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), "", new WorkspaceSelector(),
+        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), "", new StatusBuildSelector(true),
                 "**", ".hg/**", "", false, false, true));
-        // Run a build that places a file in the workspace, but does not archive anything
         other.getBuildersList().add(new ArtifactBuilder());
+        other.getPublishersList().add(new ArtifactArchiver("**/*"));
         assertBuildStatusSuccess(other.scheduleBuild2(0, new UserCause()).get());
         FreeStyleBuild b = p.scheduleBuild2(0, new UserCause()).get();
         assertBuildStatusSuccess(b);
@@ -491,12 +491,15 @@ public class CopyArtifactTest extends HudsonTestCase {
         assertFile(false, ".hg/defaultexclude.txt", b);
     }
 
-    public void testCopyFromWorkspaceWithDefaultExcludesWithFlatten() throws Exception {
+    public void testDefaultExcludesWithFlatten() throws Exception {
         FreeStyleProject other = createFreeStyleProject(), p = createFreeStyleProject();
-        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), "", new WorkspaceSelector(),
+        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), "", new StatusBuildSelector(true),
                 "", "", true, false));
         // Run a build that places a file in the workspace, but does not archive anything
         other.getBuildersList().add(new ArtifactBuilder());
+        ArtifactArchiver aa = new ArtifactArchiver("**/*");
+        aa.setDefaultExcludes(false);
+        other.getPublishersList().add(aa);
         assertBuildStatusSuccess(other.scheduleBuild2(0, new UserCause()).get());
         FreeStyleBuild b = p.scheduleBuild2(0, new UserCause()).get();
         assertBuildStatusSuccess(b);
@@ -505,10 +508,11 @@ public class CopyArtifactTest extends HudsonTestCase {
 
     public void testExcludesWithFlatten() throws Exception {
         FreeStyleProject other = createFreeStyleProject(), p = createFreeStyleProject();
-        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), "", new WorkspaceSelector(),
+        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), "", new StatusBuildSelector(true),
                 "**", ".hg/**", "", true, false, true));
         // Run a build that places a file in the workspace, but does not archive anything
         other.getBuildersList().add(new ArtifactBuilder());
+        other.getPublishersList().add(new ArtifactArchiver("**/*"));
         assertBuildStatusSuccess(other.scheduleBuild2(0, new UserCause()).get());
         FreeStyleBuild b = p.scheduleBuild2(0, new UserCause()).get();
         assertBuildStatusSuccess(b);
@@ -823,7 +827,12 @@ public class CopyArtifactTest extends HudsonTestCase {
             
             dest = jenkins.getItemByFullName(dest.getFullName(), FreeStyleProject.class);
             CopyArtifact ca = dest.getBuildersList().getAll(CopyArtifact.class).get(0);
-            assertEquals("Should ignore/clear value for inaccessible project", "", ca.getProjectName());
+            
+            // since 2.0, the check is not performed at the configuration time.
+            assertEquals(src.getName(), ca.getProjectName());
+            
+            // the check is performed at runtime.
+            assertBuildStatus(Result.FAILURE, dest.scheduleBuild2(0).get());
         }
         
         // test access from joe
@@ -853,6 +862,13 @@ public class CopyArtifactTest extends HudsonTestCase {
             dest = jenkins.getItemByFullName(dest.getFullName(), FreeStyleProject.class);
             CopyArtifact ca = dest.getBuildersList().getAll(CopyArtifact.class).get(0);
             assertEquals("Should ignore/clear value for inaccessible project", src.getName(), ca.getProjectName());
+            
+            // the check is performed at runtime.
+            QueueItemAuthenticatorConfiguration.get().getAuthenticators().clear();
+            QueueItemAuthenticatorConfiguration.get().getAuthenticators().add(
+                    new TestQueueItemAuthenticator(User.get("joe").impersonate())
+            );
+            assertBuildStatusSuccess(dest.scheduleBuild2(0));
         }
     }
 
