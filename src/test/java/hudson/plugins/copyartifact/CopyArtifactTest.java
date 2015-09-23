@@ -450,28 +450,16 @@ public class CopyArtifactTest extends HudsonTestCase {
         assertFile(false, dir + pomName("moduleC", "1.0-SNAPSHOT"), b);
     }
 
-    /** Test copy from workspace instead of artifacts area */
-    public void testCopyFromWorkspace() throws Exception {
-        FreeStyleProject other = createFreeStyleProject(), p = createFreeStyleProject();
-        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), null, new WorkspaceSelector(),
-                "**/*.txt", "", true, false, true));
-        // Run a build that places a file in the workspace, but does not archive anything
-        other.getBuildersList().add(new ArtifactBuilder());
-        assertBuildStatusSuccess(other.scheduleBuild2(0, new UserCause()).get());
-        FreeStyleBuild b = p.scheduleBuild2(0, new UserCause()).get();
-        assertBuildStatusSuccess(b);
-        assertFile(true, "foo.txt", b);
-        assertFile(true, "subfoo.txt", b);
-        assertFile(false, "c.log", b);
-    }
-
     /** Test copy from workspace containing default ant excludes */
-    public void testCopyFromWorkspaceWithDefaultExcludes() throws Exception {
+    public void testDefaultExcludes() throws Exception {
         FreeStyleProject other = createFreeStyleProject(), p = createFreeStyleProject();
-        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), "", new WorkspaceSelector(),
+        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), "", new StatusBuildSelector(true),
                 "", "", false, false));
         // Run a build that places a file in the workspace, but does not archive anything
         other.getBuildersList().add(new ArtifactBuilder());
+        ArtifactArchiver aa = new ArtifactArchiver("**/*");
+        aa.setDefaultExcludes(false);
+        other.getPublishersList().add(aa);
         assertBuildStatusSuccess(other.scheduleBuild2(0, new UserCause()).get());
         FreeStyleBuild b = p.scheduleBuild2(0, new UserCause()).get();
         assertBuildStatusSuccess(b);
@@ -1533,6 +1521,9 @@ public class CopyArtifactTest extends HudsonTestCase {
         return jenkins.getRootPath().mode() != -1;
     }
     
+    /*
+    // @Ignore doesn't work with JUnit3.
+    @Ignore("VirtualFile (ArtifactArchiver) doesn't support file permissions.")
     public void testFilePermission() throws Exception {
         if (!isFilePermissionSupported()) {
             Logger.getLogger(CopyArtifactTest.class.getName()).warning(String.format(
@@ -1674,8 +1665,12 @@ public class CopyArtifactTest extends HudsonTestCase {
             assertEquals(0755, w.child("artifactWithExecuteInSubdir.txt").mode() & 0777);
         }
     }
+    */
 
+    /*
+    // @Ignore doesn't work with JUnit3.
     @Bug(20546)
+    @Ignore("VirtualFile (ArtifactArchiver) doesn't support symbolic links.")
     public void testSymlinks() throws Exception {
         FreeStyleProject p1 = createFreeStyleProject("p1");
         p1.getBuildersList().add(new TestBuilder() {
@@ -1696,6 +1691,7 @@ public class CopyArtifactTest extends HudsonTestCase {
         assertEquals("plain", ws.child("link1").readLink());
         assertEquals("nonexistent", ws.child("link2").readLink());
     }
+    */
     
     private static class TestQueueItemAuthenticator extends jenkins.security.QueueItemAuthenticator {
         private final org.acegisecurity.Authentication auth;
