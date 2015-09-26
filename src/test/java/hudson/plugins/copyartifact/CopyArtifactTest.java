@@ -775,6 +775,7 @@ public class CopyArtifactTest extends HudsonTestCase {
         ProjectMatrixAuthorizationStrategy pmas = new ProjectMatrixAuthorizationStrategy();
         pmas.add(Jenkins.READ, Jenkins.ANONYMOUS.getName());
         pmas.add(Jenkins.READ, "joe");
+        pmas.add(Computer.BUILD, "joe");
         jenkins.setAuthorizationStrategy(pmas);
         
         // only joe can access project "src"
@@ -784,6 +785,9 @@ public class CopyArtifactTest extends HudsonTestCase {
             auths.put(Item.READ, Sets.newHashSet("joe"));
             src.addProperty(new AuthorizationMatrixProperty(auths));
         }
+        src.getBuildersList().add(new ArtifactBuilder());
+        src.getPublishersList().add(new ArtifactArchiver("**/*"));
+        assertBuildStatusSuccess(src.scheduleBuild2(0));
         
         // test access from anonymous
         {
@@ -839,6 +843,7 @@ public class CopyArtifactTest extends HudsonTestCase {
             Map<Permission, Set<String>> auths = new HashMap<Permission, Set<String>>();
             auths.put(Item.READ, Sets.newHashSet("joe"));
             auths.put(Item.CONFIGURE, Sets.newHashSet("joe"));
+            auths.put(Item.BUILD, Sets.newHashSet("joe"));
             dest.addProperty(new AuthorizationMatrixProperty(auths));
             
             WebClient wc = createWebClient();
@@ -1505,7 +1510,7 @@ public class CopyArtifactTest extends HudsonTestCase {
         {
             CopyArtifact ca = caList.get(1);
             assertEquals(upstream2.getName(), ca.getProjectName());
-            assertEquals("param=value", ca.getParameters());
+            assertEqualDataBoundBeans(new ParametersBuildFilter("param=value"), ca.getBuildFilter());
             assertEquals(TriggeredBuildSelector.class, ca.getBuildSelector().getClass());
             assertEquals("**", ca.getFilter());
             assertEquals("foobar.txt", ca.getExcludes());
