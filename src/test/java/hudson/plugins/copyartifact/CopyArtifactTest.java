@@ -1181,7 +1181,7 @@ public class CopyArtifactTest extends HudsonTestCase {
         assertFalse(configXml, configXml.contains("<projectName>"));
         assertTrue(configXml, configXml.contains("<project>plain</project>"));
         assertTrue(configXml, configXml.contains("<project>parameterized</project>"));
-        assertTrue(configXml, configXml.contains("<parameters>good=true</parameters>"));
+        assertTrue(configXml, configXml.contains("<paramsToMatch>good=true</paramsToMatch>"));
         assertTrue(configXml, configXml.contains("<project>matrix/which=two</project>"));
         
         MatrixProject matrixCopier = Jenkins.getInstance().getItemByFullName("matrix-copier", MatrixProject.class);
@@ -1190,7 +1190,7 @@ public class CopyArtifactTest extends HudsonTestCase {
         assertFalse(configXml, configXml.contains("<projectName>"));
         // When a project is specified with a variable, it is split improperly.
         assertTrue(configXml, configXml.contains("<project>matrix</project>"));
-        assertTrue(configXml, configXml.contains("<parameters>which=${which}</parameters>"));
+        assertTrue(configXml, configXml.contains("<paramsToMatch>which=${which}</paramsToMatch>"));
     }
 
     // A builder wrapping another builder.
