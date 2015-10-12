@@ -22,10 +22,10 @@
  * THE SOFTWARE.
  */
 
-package hudson.plugins.copyartifact;
+package hudson.plugins.copyartifact.filter;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
 
 import jenkins.model.Jenkins;
 
@@ -34,24 +34,27 @@ import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
-import hudson.EnvVars;
 import hudson.Extension;
+import hudson.Util;
 import hudson.model.AutoCompletionCandidates;
 import hudson.model.Item;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
-import hudson.model.Descriptor;
 import hudson.model.Job;
 import hudson.model.Run;
+import hudson.plugins.copyartifact.BuildFilter;
+import hudson.plugins.copyartifact.BuildFilterDescriptor;
+import hudson.plugins.copyartifact.CopyArtifactPickContext;
 import hudson.util.FormValidation;
 
 /**
  * Select a build which is a downstream of a specified build.
+ * @since 2.0
  */
-public class DownstreamBuildSelector extends BuildSelector {
-    private static final Logger LOGGER = Logger.getLogger(DownstreamBuildSelector.class.getName());
-    private static final String COPIER_PROJECT_KEY = "___COPIER_PROJECT_KEY___";
+public class DownstreamBuildFilter extends BuildFilter {
+    @Nonnull
     private final String upstreamProjectName;
+    @Nonnull
     private final String upstreamBuildNumber;
     
     /**
@@ -59,14 +62,15 @@ public class DownstreamBuildSelector extends BuildSelector {
      * @param upstreamBuildNumber
      */
     @DataBoundConstructor
-    public DownstreamBuildSelector(String upstreamProjectName, String upstreamBuildNumber) {
-        this.upstreamProjectName = StringUtils.trim(upstreamProjectName);
-        this.upstreamBuildNumber = StringUtils.trim(upstreamBuildNumber);
+    public DownstreamBuildFilter(@CheckForNull String upstreamProjectName, @CheckForNull String upstreamBuildNumber) {
+        this.upstreamProjectName = Util.fixNull(upstreamProjectName).trim();
+        this.upstreamBuildNumber = Util.fixNull(upstreamBuildNumber).trim();
     }
     
     /**
      * @return upstream project name. May include variable expression.
      */
+    @Nonnull
     public String getUpstreamProjectName() {
         return upstreamProjectName;
     }
@@ -74,66 +78,53 @@ public class DownstreamBuildSelector extends BuildSelector {
     /**
      * @return upstream build number. May include variable expression.
      */
+    @Nonnull
     public String getUpstreamBuildNumber() {
         return upstreamBuildNumber;
     }
     
     @Override
-    public Run<?, ?> getBuild(Job<?, ?> job, EnvVars env, BuildFilter filter, Run<?, ?> parent) {
-        EnvVars extendedEnv = new EnvVars(env);
-        // Workaround to pass who is copier to isSelectable().
-        extendedEnv.put(COPIER_PROJECT_KEY, parent.getParent().getFullName());
-        return super.getBuild(job, extendedEnv, filter, parent);
-    }
-    
-    @Override
-    protected boolean isSelectable(Run<?, ?> run, EnvVars env) {
+    public boolean isSelectable(@Nonnull Run<?, ?> run, @Nonnull CopyArtifactPickContext context) {
         if (!(run instanceof AbstractBuild<?,?>)) {
-            LOGGER.warning(String.format("Only applicable to AbstractBuild: but is %s.", run.getClass().getName()));
-            return false;
-        }
-        Jenkins jenkins = Jenkins.getInstance();
-        if (jenkins == null) {
-            // to suppress findbugs warnings.
-            LOGGER.log(
-                    Level.SEVERE,
-                    "Jenkins instance isn't available and cannot perform copyartifact from",
-                    run.getDisplayName()
-            );
+            context.logInfo("{0}: Only applicable to AbstractBuild: but is {1}.", getDisplayName(), run.getClass().getName());
             return false;
         }
         
-        // Workaround to retrieve who is copying.
-        Job<?,?> copier = jenkins.getItemByFullName(env.get(COPIER_PROJECT_KEY), Job.class);
-        if (copier != null && (copier instanceof AbstractProject<?,?>)) {
+        Job<?,?> copier = context.getCopierBuild().getParent();
+        if (copier instanceof AbstractProject<?,?>) {
             copier = ((AbstractProject<?,?>)copier).getRootProject();
         }
         
-        String projectName = env.expand(getUpstreamProjectName());
-        String buildNumber = env.expand(getUpstreamBuildNumber());
+        String projectName = context.getEnvVars().expand(getUpstreamProjectName());
+        String buildNumber = context.getEnvVars().expand(getUpstreamBuildNumber());
         
         if (StringUtils.isBlank(projectName)) {
-            LOGGER.warning("Upstream project name gets empty.");
+            context.logInfo("{0}: Upstream project name gets empty.", getDisplayName());
             return false;
         }
         
         if (StringUtils.isBlank(buildNumber)) {
-            LOGGER.warning("Upstream build number gets empty.");
+            context.logInfo("{0}: Upstream build number gets empty.", getDisplayName());
             return false;
         }
         
-        AbstractProject<?,?> upstreamProject = jenkins.getItem(
+        AbstractProject<?,?> upstreamProject = context.getJenkins().getItem(
                 projectName,
                 copier,
                 AbstractProject.class
         );
         if (upstreamProject == null || !upstreamProject.hasPermission(Item.READ)) {
-            LOGGER.warning(String.format("Upstream project '%s' is not found.", projectName));
+            context.logInfo(String.format("{0}: Upstream project '{1}' is not found.", getDisplayName(), projectName));
             return false;
         }
         AbstractBuild<?,?> upstreamBuild = ((AbstractBuild<?,?>)run).getUpstreamRelationshipBuild(upstreamProject);
         if (upstreamBuild == null || !upstreamBuild.hasPermission(Item.READ)) {
-            LOGGER.fine(String.format("No upstream build of project '%s' is found for build %s-%s.", upstreamProject.getFullName(), run.getParent().getFullName(), run.getDisplayName()));
+            context.logDebug(
+                    "{0}: No upstream build of project '{1}' is found for build {2}.",
+                    getDisplayName(),
+                    upstreamProject.getFullName(),
+                    run.getFullDisplayName()
+            );
             return false;
         }
         
@@ -152,15 +143,21 @@ public class DownstreamBuildSelector extends BuildSelector {
             return true;
         }
         
-        LOGGER.fine(String.format("build %s-%s doesn't match %s.", run.getParent().getFullName(), run.getDisplayName(), buildNumber));
+        context.logDebug(
+                "{0}: build {1} doesn't match {2}-{3}.",
+                getDisplayName(),
+                run.getParent().getFullName(),
+                run.getDisplayName(),
+                buildNumber
+        );
         return false;
     }
     
     @Extension
-    public static final class DescriptorImpl extends Descriptor<BuildSelector> {
+    public static final class DescriptorImpl extends BuildFilterDescriptor {
         @Override
         public String getDisplayName() {
-            return Messages.DownstreamBuildSelector_DisplayName();
+            return Messages.DownstreamBuildFilter_DisplayName();
         }
         
         /**
@@ -182,7 +179,7 @@ public class DownstreamBuildSelector extends BuildSelector {
         ) {
             upstreamProjectName = StringUtils.trim(upstreamProjectName);
             if (StringUtils.isBlank(upstreamProjectName)) {
-                return FormValidation.error(Messages.DownstreamBuildSelector_UpstreamProjectName_Required());
+                return FormValidation.error(Messages.DownstreamBuildFilter_UpstreamProjectName_Required());
             }
             
             if (containsVariable(upstreamProjectName)) {
@@ -199,7 +196,7 @@ public class DownstreamBuildSelector extends BuildSelector {
                     upstreamProjectName, project.getRootProject(), AbstractProject.class
             );
             if (upstreamProject == null || !upstreamProject.hasPermission(Item.READ)) {
-                return FormValidation.error(Messages.DownstreamBuildSelector_UpstreamProjectName_NotFound());
+                return FormValidation.error(Messages.DownstreamBuildFilter_UpstreamProjectName_NotFound());
             }
             return FormValidation.ok();
         }
@@ -225,7 +222,7 @@ public class DownstreamBuildSelector extends BuildSelector {
             }
             
             if (StringUtils.isBlank(upstreamBuildNumber)) {
-                return FormValidation.error(Messages.DownstreamBuildSelector_UpstreamBuildNumber_Required());
+                return FormValidation.error(Messages.DownstreamBuildFilter_UpstreamBuildNumber_Required());
             }
             
             if (containsVariable(upstreamBuildNumber)) {
@@ -277,7 +274,7 @@ public class DownstreamBuildSelector extends BuildSelector {
                 }
             }
             
-            return FormValidation.error(Messages.DownstreamBuildSelector_UpstreamBuildNumber_NotFound());
+            return FormValidation.error(Messages.DownstreamBuildFilter_UpstreamBuildNumber_NotFound());
         }
         
         /**
