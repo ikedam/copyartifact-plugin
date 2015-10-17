@@ -96,7 +96,7 @@ public class CopyArtifactWorkflowTest {
         copier.addProperty(new ParametersDefinitionProperty(
                 new StringParameterDefinition("PARAM_TO_COPY", "")
         ));
-        copier.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(
+        CopyArtifact ca = CopyArtifactUtil.createCopyArtifact(
                 copiee.getFullName(),
                 "PARAM=${PARAM_TO_COPY}",
                 new LastCompletedBuildSelector(),
@@ -104,7 +104,9 @@ public class CopyArtifactWorkflowTest {
                 "",
                 false,
                 false
-        ));
+        );
+        ca.upgradeFromCopyartifact10();
+        copier.getBuildersList().add(ca);
         
         // #1: PARAM=foo
         jenkinsRule.assertBuildStatusSuccess(copiee.scheduleBuild2(0, new ParametersAction(

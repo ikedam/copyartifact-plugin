@@ -37,6 +37,7 @@ import hudson.model.SimpleParameterDefinition;
 import hudson.model.StringParameterValue;
 import hudson.util.XStream2;
 import net.sf.json.JSONObject;
+
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
 
@@ -142,6 +143,7 @@ public class BuildSelectorParameter extends SimpleParameterDefinition {
 
     private static final XStream2 XSTREAM = new XStream2();
 
+    @SuppressWarnings("deprecation")
     static void initAliases() {
         Jenkins jenkins = Jenkins.getInstance();
         if (jenkins == null) {
@@ -151,5 +153,11 @@ public class BuildSelectorParameter extends SimpleParameterDefinition {
         // Alias all BuildSelectors to their simple names
         for (Descriptor<BuildSelector> d : jenkins.getDescriptorByType(DescriptorImpl.class).getBuildSelectors())
             XSTREAM.alias(d.clazz.getSimpleName(), d.clazz);
+        
+        // For backward compatibilities
+        XSTREAM.alias("DownstreamBuildSelector", DownstreamBuildSelector.class);
+        XSTREAM.alias("LastCompletedBuildSelector", LastCompletedBuildSelector.class);
+        XSTREAM.alias("SavedBuildSelector", SavedBuildSelector.class);
+        XSTREAM.alias("WorkspaceBuildSelector", WorkspaceSelector.class);
     }
 }

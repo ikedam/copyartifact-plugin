@@ -552,8 +552,10 @@ public class CopyArtifactTest extends HudsonTestCase {
     public void testSavedBuildSelector() throws Exception {
         FreeStyleProject other = createArtifactProject(),
                          p = createFreeStyleProject();
-        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(),
-                null, new SavedBuildSelector(), "*.txt", "", false, false, true));
+        CopyArtifact ca = CopyArtifactUtil.createCopyArtifact(other.getName(),
+                null, new SavedBuildSelector(), "*.txt", "", false, false, true);
+        ca.upgradeFromCopyartifact10();
+        p.getBuildersList().add(ca);
         FreeStyleBuild b = other.scheduleBuild2(0, new UserCause(),
                 new ParametersAction(new StringParameterValue("FOO", "buildone"))).get();
         assertBuildStatusSuccess(b);
@@ -1127,8 +1129,10 @@ public class CopyArtifactTest extends HudsonTestCase {
                 new ParametersAction(new StringParameterValue("FOO", "buildone"))).get();
         assertBuildStatusSuccess(b);
         b.keepLog(true);
-        p.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(other.getName(), "FOO=buildone",
-                new SavedBuildSelector(), "*.txt", "", false, false, true));
+        CopyArtifact ca = CopyArtifactUtil.createCopyArtifact(other.getName(), "FOO=buildone",
+                new SavedBuildSelector(), "*.txt", "", false, false, true);
+        ca.upgradeFromCopyartifact10();
+        p.getBuildersList().add(ca);
         assertBuildStatusSuccess(b = other.scheduleBuild2(0, new UserCause()).get());
         b.keepLog(true); // Keep #2 too, but it doesn't have FOO=buildone so should not be selected
         assertBuildStatusSuccess(b = p.scheduleBuild2(0, new UserCause()).get());
