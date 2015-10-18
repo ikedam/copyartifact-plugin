@@ -309,7 +309,7 @@ public class DownstreamBuildSelectorTest {
         upstream.getPublishersList().add(new BuildTrigger(downstream.getFullName(), Result.SUCCESS.toString()));
         
         downstream.getBuildersList().add(new FileWriteBuilder("artifact2.txt", "${BUILD_ID}"));
-        downstream.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(
+        CopyArtifact ca1 = CopyArtifactUtil.createCopyArtifact(
                 upstream.getFullName(),
                 "",
                 new TriggeredBuildSelector(
@@ -323,7 +323,9 @@ public class DownstreamBuildSelectorTest {
                 false,
                 false,
                 true    // important! required to have Jenkins track builds.
-        ));
+        );
+        ca1.upgradeFromCopyartifact10();
+        downstream.getBuildersList().add(ca1);
         downstream.getPublishersList().add(new ArtifactArchiver(
                 "artifact2.txt",
                 "",
@@ -362,7 +364,7 @@ public class DownstreamBuildSelectorTest {
                 new StringParameterDefinition("UPSTREAM_PROJECT_NAME", ""),
                 new StringParameterDefinition("UPSTREAM_BUILD_NUMBER", "")
         ));
-        CopyArtifact ca = CopyArtifactUtil.createCopyArtifact(
+        CopyArtifact ca2 = CopyArtifactUtil.createCopyArtifact(
                 downstream.getFullName(),
                 "",
                 new DownstreamBuildSelector(
@@ -378,8 +380,8 @@ public class DownstreamBuildSelectorTest {
                     // This allows us to find exceptions.
                 true
         );
-        ca.upgradeFromCopyartifact10();
-        p.getBuildersList().add(ca);
+        ca2.upgradeFromCopyartifact10();
+        p.getBuildersList().add(ca2);
         
         // upstreamProjectName is empty
         {
@@ -458,7 +460,7 @@ public class DownstreamBuildSelectorTest {
         upstream.getPublishersList().add(new BuildTrigger("../folder2/downstream", Result.SUCCESS.toString()));
         
         downstream.getBuildersList().add(new FileWriteBuilder("artifact2.txt", "${BUILD_ID}"));
-        downstream.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(
+        CopyArtifact ca1 = CopyArtifactUtil.createCopyArtifact(
                 "../folder1/upstream",
                 "",
                 new TriggeredBuildSelector(
@@ -472,7 +474,9 @@ public class DownstreamBuildSelectorTest {
                 false,
                 false,
                 true    // important! required to have Jenkins track builds.
-        ));
+        );
+        ca1.upgradeFromCopyartifact10();
+        downstream.getBuildersList().add(ca1);
         downstream.getPublishersList().add(new ArtifactArchiver(
                 "artifact2.txt",
                 "",
@@ -492,7 +496,7 @@ public class DownstreamBuildSelectorTest {
         j.assertBuildStatusSuccess(upstreamBuild);
         j.assertBuildStatusSuccess(downstreamBuild);
         
-        CopyArtifact ca = CopyArtifactUtil.createCopyArtifact(
+        CopyArtifact ca2 = CopyArtifactUtil.createCopyArtifact(
                 "../../folder2/downstream",
                 "",
                 new DownstreamBuildSelector(
@@ -506,8 +510,8 @@ public class DownstreamBuildSelectorTest {
                 false,
                 true
         );
-        ca.upgradeFromCopyartifact10();
-        copier.getBuildersList().add(ca);
+        ca2.upgradeFromCopyartifact10();
+        copier.getBuildersList().add(ca2);
         
         FreeStyleBuild b = copier.scheduleBuild2(0).get();
         j.assertBuildStatusSuccess(b);
