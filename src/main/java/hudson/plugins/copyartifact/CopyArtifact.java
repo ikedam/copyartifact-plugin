@@ -68,7 +68,6 @@ import org.acegisecurity.Authentication;
 import org.acegisecurity.GrantedAuthority;
 import org.acegisecurity.providers.UsernamePasswordAuthenticationToken;
 import org.apache.commons.lang.StringUtils;
-import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
@@ -76,6 +75,7 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.Stapler;
 import org.kohsuke.stapler.StaplerRequest;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -121,9 +121,6 @@ public class CopyArtifact extends Builder implements SimpleBuildStep {
         setFilter(filter);
         setTarget(target);
         setExcludes(excludes);
-        if (selector == null) {
-            selector = DEFAULT_BUILD_SELECTOR;
-        }
         setSelector(selector);
         setFlatten(flatten);
         setOptional(optional);
@@ -154,7 +151,7 @@ public class CopyArtifact extends Builder implements SimpleBuildStep {
         setFilter(null);
         setTarget(null);
         setExcludes(null);
-        setSelector(DEFAULT_BUILD_SELECTOR);
+        setSelector(null);
         setFlatten(false);
         setOptional(false);
         setFingerprintArtifacts(false);
@@ -182,7 +179,10 @@ public class CopyArtifact extends Builder implements SimpleBuildStep {
     }
 
     @DataBoundSetter
-    public void setSelector(@Nonnull BuildSelector selector) {
+    public void setSelector(@CheckForNull BuildSelector selector) {
+        if (selector == null) {
+            selector = DEFAULT_BUILD_SELECTOR;
+        }
         this.selector = selector;
     }
 
@@ -574,7 +574,7 @@ public class CopyArtifact extends Builder implements SimpleBuildStep {
         return expected.equals(expanded);
     }
     
-    @Extension @Symbol("copyArtifacts")
+    @Extension
     public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
 
         public FormValidation doCheckProjectName(
