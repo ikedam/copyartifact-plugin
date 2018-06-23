@@ -28,6 +28,7 @@ import hudson.model.FreeStyleBuild;
 import hudson.model.FreeStyleProject;
 import hudson.model.ParametersAction;
 import hudson.model.ParametersDefinitionProperty;
+import hudson.model.Result;
 import hudson.model.Run;
 import hudson.model.StringParameterDefinition;
 import hudson.model.StringParameterValue;
@@ -35,6 +36,7 @@ import hudson.model.Cause.UserCause;
 import hudson.plugins.copyartifact.testutils.CopyArtifactJenkinsRule;
 import hudson.plugins.copyartifact.testutils.CopyArtifactUtil;
 import hudson.plugins.copyartifact.testutils.FileWriteBuilder;
+import hudson.security.GlobalMatrixAuthorizationStrategy;
 import hudson.tasks.ArtifactArchiver;
 
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition;
@@ -337,5 +339,73 @@ public class CopyArtifactWorkflowTest {
             + "echo readFile('artifact.txt');"
         );
         jenkinsRule.assertLogContains("foobar", jenkinsRule.assertBuildStatusSuccess(copier.scheduleBuild2(0)));
+    }
+
+    @Test
+    public void testNoCopyArtifactPermissionProperty() throws Exception {
+        jenkinsRule.jenkins.setSecurityRealm(jenkinsRule.createDummySecurityRealm());
+        jenkinsRule.jenkins.setAuthorizationStrategy(new GlobalMatrixAuthorizationStrategy());
+
+        WorkflowJob copiee = jenkinsRule.createProject(WorkflowJob.class, "copiee");
+        copiee.setDefinition(new CpsFlowDefinition(
+            "node {"
+            + "  writeFile text: 'foobar', file: 'artifact.txt';"
+            + "  archive includes: 'artifact.txt';"
+            + "}",
+            true // Run in sandbox
+        ));
+        WorkflowRun r = jenkinsRule.assertBuildStatusSuccess(copiee.scheduleBuild2(0));
+
+        FreeStyleProject copier = jenkinsRule.createFreeStyleProject();
+        copier.addProperty(new ParametersDefinitionProperty(
+            new StringParameterDefinition("job",  copiee.getFullName()),
+            new StringParameterDefinition("build",  r.getId())
+        ));
+        copier.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(
+            "${job}",
+            "",
+            new SpecificBuildSelector("${build}"),
+            "",
+            "",
+            false,
+            false
+        ));
+        // Build fails as anonymous cannot read copiee.
+        jenkinsRule.assertBuildStatus(Result.FAILURE, copier.scheduleBuild2(0));
+    }
+
+    @Test
+    public void testCopyArtifactPermissionProperty() throws Exception {
+        jenkinsRule.jenkins.setSecurityRealm(jenkinsRule.createDummySecurityRealm());
+        jenkinsRule.jenkins.setAuthorizationStrategy(new GlobalMatrixAuthorizationStrategy());
+
+        WorkflowJob copiee = jenkinsRule.createProject(WorkflowJob.class, "copiee");
+        copiee.setDefinition(new CpsFlowDefinition(
+            "properties(["
+            + "  copyArtifactPermission('copier')"
+            + "]);"
+            + "node {"
+            + "  writeFile text: 'foobar', file: 'artifact.txt';"
+            + "  archive includes: 'artifact.txt';"
+            + "}",
+            true // Run in sandbox
+        ));
+        WorkflowRun r = jenkinsRule.assertBuildStatusSuccess(copiee.scheduleBuild2(0));
+
+        FreeStyleProject copier = jenkinsRule.createFreeStyleProject("copier");
+        copier.addProperty(new ParametersDefinitionProperty(
+            new StringParameterDefinition("job",  copiee.getFullName()),
+            new StringParameterDefinition("build",  r.getId())
+        ));
+        copier.getBuildersList().add(CopyArtifactUtil.createCopyArtifact(
+            "${job}",
+            "",
+            new SpecificBuildSelector("${build}"),
+            "",
+            "",
+            false,
+            false
+        ));
+        jenkinsRule.assertBuildStatusSuccess(copier.scheduleBuild2(0));
     }
 }
